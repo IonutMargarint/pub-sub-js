@@ -1,95 +1,90 @@
 import PubSub from "../lib/pubsub.js";
 
 export default class Store {
-	constructor(params) {
-		//add default objects (actions, mutations, state)
+  constructor(params) {
+    //add default objects (actions, mutations, state)
 
-		this.actions = {};
-		this.mutations = {};
-		this.state = {};
+    this.actions = {};
+    this.mutations = {};
+    this.state = {};
 
-		this.status = "resting";
+    this.status = "resting";
 
-		// PubSub module
-		this.events = new PubSub();
+    // PubSub module
+    this.events = new PubSub();
 
-		// check passed params object for actions and mutations
+    // check passed params object for actions and mutations
 
-		if (params.hasOwnProperty("actions")) {
-			this.actions = params.actions;
-		}
+    if (params.hasOwnProperty("actions")) {
+      this.actions = params.actions;
+    }
 
-		if (params.hasOwnProperty("mutations")) {
-			this.mutations = params.mutations;
-		}
+    if (params.hasOwnProperty("mutations")) {
+      this.mutations = params.mutations;
+    }
 
-		// set state as a Proxy.
-		this.state = new Proxy(params.state || {}, {
-			set: (state, key, value) => {
-				state[key] = value;
+    // set state as a Proxy.
+    this.state = new Proxy(params.state || {}, {
+      set: (state, key, value) => {
+        state[key] = value;
 
-				console.log(`stateChange: ${key}: ${value}`);
+        console.log(`stateChange: ${key}: ${value}`);
 
-				// publish the change event
-				this.events.publish("stateChange", this.state);
+        // publish the change event
+        this.events.publish("stateChange", this.state);
 
-				// warn if the value is set directly
-				if (this.status !== "mutation") {
-					console.warn(`You should use a mutation to set ${key}`);
-				}
+        // warn if the value is set directly
+        if (this.status !== "mutation") {
+          console.warn(`You should use a mutation to set ${key}`);
+        }
 
-				// reset the status
-				this.status = "resting";
+        // reset the status
+        this.status = "resting";
 
-				return true;
-			}
-		});
-	}
+        //indicate success
+        return true;
+      }
+    });
+  }
 
-	// dispatcher for actions
+  // dispatcher for actions
 
-	dispatch(actionKey, payload) {
-		// check if the action exists
+  dispatch(actionKey, payload) {
+    // check if the action exists
 
-		if (typeof this.actions[actionKey] !== "function") {
-			console.error(`Action "${actionKey} doesn't exist.`);
-			return false;
-		}
+    if (typeof this.actions[actionKey] !== "function") {
+      console.error(`Action "${actionKey} doesn't exist.`);
+    }
 
-		// create a console group
-		console.groupCollapsed(`ACTION: ${actionKey}`);
+    // create a console group
+    console.groupCollapsed(`ACTION: ${actionKey}`);
 
-		// set dispatching status
-		this.status = "action";
+    // set dispatching status
+    this.status = "action";
 
-		// call the action, pass the Store and payload
-		this.actions[actionKey](this, payload);
+    // call the action, pass the Store and payload
+    this.actions[actionKey](this, payload);
 
-		// close console group
-		console.groupEnd();
+    // close console group
+    console.groupEnd();
+  }
 
-		return true;
-	}
+  // check for mutations and modify the state object
 
-	// check for mutations and modify the state object
+  commit(mutationKey, payload) {
+    // check for mutations
 
-	commit(mutationKey, payload) {
-		// check for mutations
+    if (typeof this.mutations[mutationKey] !== "function") {
+      console.log(`Mutation "${mutationKey}" doesn't exist`);
+    }
 
-		if (typeof this.mutations[mutationKey] !== "function") {
-			console.log(`Mutation "${mutationKey}" doesn't exist`);
-			return false;
-		}
+    // set status
+    this.status = "mutation";
 
-		// set status
-		this.status = "mutation";
+    // get new state version
+    let newState = this.mutations[mutationKey](this.state, payload);
 
-		// get new state version
-		let newState = this.mutations[mutationKey](this.state, payload);
-
-		// create new state
-		this.state = Object.assign(this.state, newState);
-
-		return true;
-	}
+    // create new state
+    this.state = Object.assign(this.state, newState);
+  }
 }
